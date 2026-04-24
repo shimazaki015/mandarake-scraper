@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>まんだらけスクレイパー</title>
+</head>
+<body>
+  <h2>まんだらけ オークションスクレイパー</h2>
+
+  <input id="url" style="width:500px;" placeholder="一覧URLを貼る">
+  <br><br>
+
+  <button onclick="run()">スクレイプ開始</button>
+
+  <p id="status"></p>
+
+  <script>
+    async function run() {
+      const url = document.getElementById("url").value;
+      if (!url) return alert("URL入れてください");
+
+      document.getElementById("status").innerText = "実行中（10〜15分かかります）";
+
+      const res = await fetch(`/api/scrape?url=${encodeURIComponent(url)}`);
+      const blob = await res.blob();
+
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "mandarake.csv";
+      a.click();
+
+      document.getElementById("status").innerText = "完了！";
+    }
+  </script>
+</body>
+</html>
