@@ -16,12 +16,21 @@ export default async function handler(req, res) {
 
     const links = [];
 
-    $("a").each((i, el) => {
-      const href = $(el).attr("href");
-      if (href && href.includes("itemInfoJa.html")) {
-        links.push(base + href);
-      }
-    });
+    $("a[href*='itemInfoJa.html']").each((i, el) => {
+  let href = $(el).attr("href");
+
+  if (!href) return;
+
+  // 正しいパスだけ許可
+  if (!href.includes("/auction/item/")) return;
+
+  // URL補完
+  if (href.startsWith("http")) {
+    links.push(href);
+  } else {
+    links.push(base + href);
+  }
+});
 
     const uniqueLinks = [...new Set(links)];
 
