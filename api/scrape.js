@@ -35,6 +35,7 @@ export default async function handler(req, res) {
       await sleep(1000);
 
       const detailHtml = await fetch(link).then(r => r.text());
+      console.log(detailHtml.slice(0, 500));
       const $$ = cheerio.load(detailHtml);
 
       const bodyText = $$.root().text();
