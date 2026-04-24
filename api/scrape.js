@@ -10,98 +10,89 @@ export default async function handler(req, res) {
 
     const base = "https://ekizo.mandarake.co.jp";
 
-    // 一覧取得
     const html = await fetch(listUrl).then(r => r.text());
     const $ = cheerio.load(html);
 
     const links = [];
 
     $("a[href*='itemInfoJa.html']").each((i, el) => {
-  let href = $(el).attr("href");
+      let href = $(el).attr("href");
+      if (!href) return;
+      if (!href.includes("/auction/item/")) return;
 
-  if (!href) return;
-
-  // 正しいパスだけ許可
-  if (!href.includes("/auction/item/")) return;
-
-  // URL補完
-  if (href.startsWith("http")) {
-    links.push(href);
-  } else {
-    links.push(base + href);
-  }
-});
+      if (href.startsWith("http")) {
+        links.push(href);
+      } else {
+        links.push(base + href);
+      }
+    });
 
     const uniqueLinks = [...new Set(links)];
 
     const results = [];
 
     for (const link of uniqueLinks) {
-      await sleep(1000); // 安全ディレイ
+      await sleep(1000);
 
       const detailHtml = await fetch(link).then(r => r.text());
       const $$ = cheerio.load(detailHtml);
 
-      const text = $$.root().text();
+      const bodyText = $$.root().text();
 
-      const getText = (label) => {
-        const el = $$(`th:contains("${label}")`).next("td");
-        return el.text().trim();
+      const pick = (label) => {
+        const regex = new RegExp(label + "[^\\n]*");
+        const match = bodyText.match(regex);
+        if (!match) return "";
+        return match[0]
+          .replace(label, "")
+          .replace("：", "")
+          .replace(":", "")
+          .trim();
       };
 
-      // パンくず
+      const comment = pick("コメント");
+
+      const auctionMatch = comment.match(/z\d{3}/);
+      const auctionNo = auctionMatch ? auctionMatch[0] : "";
+
+      const codeMatch = bodyText.match(/商品コード[:：]\s*(\d+)/);
+      const productCode = codeMatch ? codeMatch[1] : "";
+
+      const guarantee = bodyText.includes("保証書あり") ? "あり" : "";
+
       const breadcrumbText = $$(".topic-path").text();
       const breadcrumbArr = breadcrumbText.split(">").map(t => t.trim());
       const category = breadcrumbArr[breadcrumbArr.length - 2] || "";
 
-      // コメント
-      const comment = getText("コメント");
-
-      // オークション番号（z133）
-      const auctionMatch = comment.match(/z\d{3}/);
-      const auctionNo = auctionMatch ? auctionMatch[0] : "";
-
-      // 商品コード
-      const codeMatch = text.match(/商品コード[:：]\s*(\d+)/);
-      const productCode = codeMatch ? codeMatch[1] : "";
-
-      // 保証書
-      const guarantee = text.includes("保証書あり") ? "あり" : "";
-
-      // セルNO
-      const cellNo = getText("セルNo") || getText("セルNO");
-
       results.push({
         url: link,
         auctionNo,
-        itemName: $$("h1").text().trim(),
+        itemName: $$("title").text().trim(),
         category,
         guarantee,
-        startPrice: getText("開始価格"),
-        bids: getText("入札件数"),
-        watch: getText("ウォッチ件数"),
-        startDate: getText("開始日時"),
-        itemNumber: getText("商品番号"),
-        auctionType: getText("オークション形式"),
-        bidUnit: getText("入札単位"),
-        productName: getText("商品名"),
-        size: getText("サイズ"),
-        note: getText("備考"),
-        character: getText("キャラ"),
-        condition: getText("状態"),
-        conditionDetail: getText("状態詳細"),
-        cellNo,
+        startPrice: pick("開始価格"),
+        bids: pick("入札件数"),
+        watch: pick("ウォッチ件数"),
+        startDate: pick("開始日時"),
+        itemNumber: pick("商品番号"),
+        auctionType: pick("オークション形式"),
+        bidUnit: pick("入札単位"),
+        productName: pick("商品名"),
+        size: pick("サイズ"),
+        note: pick("備考"),
+        character: pick("キャラ"),
+        condition: pick("状態"),
+        conditionDetail: pick("状態詳細"),
+        cellNo: pick("セル"),
         comment,
         productCode
       });
     }
 
-    // 商品名でソート（日本語）
     results.sort((a, b) =>
       a.itemName.localeCompare(b.itemName, "ja")
     );
 
-    // CSV変換
     const header = [
       "URL","オークション番号","アイテム名","カテゴリー","保証書",
       "開始価格","入札件数","ウォッチ件数","開始日時","商品番号",
